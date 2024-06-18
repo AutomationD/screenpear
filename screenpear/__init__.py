@@ -24,7 +24,8 @@ def ocr(src, dst):
         raise FileNotFoundError(f'{src} not found')
 
     if dst is None:
-        dst = os.path.join(data_path, 'output', f'{Path(src).stem}-{date:%Y-%m-%dT%H%M%S}{Path(src).suffix}')
+
+        dst = os.path.join(data_path, 'output', f'{Path(src).stem}-{date:%Y-%m-%dT%H%M%S}{Path(src).suffix}'.replace('input', 'output'))
 
     if Path(dst).is_dir():
         if not os.path.exists(dst):
