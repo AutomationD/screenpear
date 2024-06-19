@@ -5,7 +5,8 @@ import numpy as np
 import datetime
 import os
 from pathlib import Path
-
+import easyocr
+import time
 
 @click.group()
 def cli():
@@ -36,8 +37,8 @@ def ocr(src, dst):
     print(f"src: {src}")
     print(f"dst: {dst}")
 
-    preprocess(src, dst)
-
+    # preprocess(src, dst)
+    ocr_image(src)
 
 def preprocess(src, dst):
     # Read the image
@@ -78,6 +79,44 @@ def preprocess(src, dst):
 
     # Save the result
     cv2.imwrite(dst, final_image)
+
+
+def ocr_image(src):
+    # Define your custom dictionary
+    custom_dict = ['HazelOps', 'hazelops']
+
+    # Initialize the reader
+    reader = easyocr.Reader(['en'], gpu=True)
+
+    # Define a function to match detected words with the custom dictionary
+    def custom_decoder(recognized_text, custom_dict):
+        recognized_words = []
+        for item in recognized_text:
+            text = item[1]
+            if text in custom_dict:
+                recognized_words.append(item)
+        return recognized_words
+
+    # Start the timer
+    start_time = time.time()
+    # Read the image
+    results = reader.readtext(src)
+    # for (bbox, text, prob) in results:
+    #     print(f"Detected text: {text} (Confidence: {prob})")
+
+    # End the timer
+    end_time = time.time()
+
+    # Calculate the duration
+    duration = end_time - start_time
+
+    # Apply custom decoder
+    filtered_results = custom_decoder(results, custom_dict)
+
+    print(f"Detected text in {duration:.2f} seconds")
+    # Print the filtered results
+    for (bbox, text, prob) in filtered_results:
+        print(f"Detected text: {text} (Confidence: {prob})")
 
 
 if __name__ == '__main__':
