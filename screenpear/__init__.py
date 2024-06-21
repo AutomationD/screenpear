@@ -79,8 +79,8 @@ def ocr(src, dst):
         print(f'{ocr_box[1]}: replaced_string={text} text_color={text_color}, background_color={background_color}')
 
 
-        # # # Draw the rectangle with the text color
-        # # cv2.rectangle(image, top_left, bottom_right, text_color.tolist(), 2)
+        # # Draw the rectangle with the text color
+        # cv2.rectangle(image, top_left, bottom_right, text_color.tolist(), 2)
         # #
         # # # Optionally, draw a smaller rectangle inside to show background color
         # # cv2.rectangle(image, (top_left[0] + 5, top_left[1] + 5), (bottom_right[0] - 5, bottom_right[1] - 5), background_color.tolist(), 2)
@@ -88,14 +88,15 @@ def ocr(src, dst):
         # # Draw the rectangle with the text color
         # cv2.rectangle(image, top_left, bottom_right, text_color.tolist(), 2)
 
+        # Draw a rectangle around the detected text with solid fill
+        cv2.rectangle(image, top_left, bottom_right, background_color.tolist(), cv2.FILLED)
+
         # Write the detected text above the bounding box
-        text_position = (top_left[0], top_left[1] - 10)  # Slightly above the top-left corner
+        text_position = (top_left[0], top_left[1]+15)  # Slightly below the top-left corner
         cv2.putText(image, text, text_position, cv2.FONT_HERSHEY_SIMPLEX, 0.8, text_color.tolist(), 2, cv2.LINE_AA)
+        # cv2.putText(image, text, text_position, cv2.FONT_HERSHEY_SIMPLEX, 0.8, text_color.tolist(), 2, cv2.LINE_AA)
 
-    image = draw_red_boxes(image, ocr_data)
-
-    background_color = get_dominant_color(image)
-
+    # image = draw_red_boxes(image, ocr_data)
     cv2.imwrite(dst, image)
 
 
