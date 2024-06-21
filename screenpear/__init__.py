@@ -28,8 +28,10 @@ def cli():
 @cli.command()
 @click.option('--src', help='')
 @click.option('--dst', help='')
-def ocr(src, dst):
+@click.option('--img_w', help='', default=-1)
 
+
+def ocr(src, dst, img_w=-1):
 
     date = datetime.datetime.now()
     data_path = os.path.join(os.getcwd(), 'data')
@@ -50,12 +52,17 @@ def ocr(src, dst):
     print(f"src: {src}")
     print(f"dst: {dst}")
 
+    # Read image in nd array before passing it to easyocr
+    image = cv2.imread(src)
+    
+    # Check the img_w argument (for desired image width) and perform resize accordingly
+    if img_w != -1:
+        image = resize(image, img_w)
+
     # preprocess(src, dst)
-    ocr_data = ocr_image(src)
+    ocr_data = ocr_image(image)
 
     # Write red boxes around detected text
-    image = cv2.imread(src)
-
     for ocr_box in ocr_data:
         text = ocr_box[1]
 
@@ -98,6 +105,13 @@ def ocr(src, dst):
 
     # image = draw_red_boxes(image, ocr_data)
     cv2.imwrite(dst, image)
+
+
+def resize(img, target_w):
+    # Resizing
+    factor_x = int(target_w) / img.shape[1]
+    img_resized = cv2.resize(img, (int(img.shape[1]* factor_x), int(img.shape[0]*factor_x)))
+    return img_resized
 
 
 def preprocess(src, dst):
