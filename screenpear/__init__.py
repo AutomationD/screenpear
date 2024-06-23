@@ -28,10 +28,10 @@ def cli():
 @cli.command()
 @click.option('--src', help='')
 @click.option('--dst', help='')
-@click.option('--img_w', help='', default=-1)
+@click.option('-w', '--width', help='')
 
 
-def ocr(src, dst, img_w=-1):
+def ocr(src, dst, width=None):
 
     date = datetime.datetime.now()
     data_path = os.path.join(os.getcwd(), 'data')
@@ -56,8 +56,8 @@ def ocr(src, dst, img_w=-1):
     image = cv2.imread(src)
     
     # Check the img_w argument (for desired image width) and perform resize accordingly
-    if img_w != -1:
-        image = resize(image, img_w)
+    if width is not None:
+        image = resize(image, width)
 
     # preprocess(src, dst)
     ocr_data = ocr_image(image)
