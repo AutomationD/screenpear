@@ -55,7 +55,7 @@ def ocr(src, dst, width=None):
     # Read image in nd array before passing it to easyocr
     image = cv2.imread(src)
     
-    # Check the img_w argument (for desired image width) and perform resize accordingly
+    # Check the width argument (for desired image width) and perform resize accordingly
     if width is not None:
         image = resize(image, width)
 
@@ -63,7 +63,7 @@ def ocr(src, dst, width=None):
     ocr_data = ocr_image(image)
 
     # Write red boxes around detected text
-    for ocr_box in ocr_data:
+    for idx, ocr_box in enumerate(ocr_data):
         text = ocr_box[1]
 
         for replacement in REPLACE_DICT.items():
@@ -74,17 +74,17 @@ def ocr(src, dst, width=None):
         # Extract the bounding box region
         box_region = image[top_left[1]:bottom_right[1], top_left[0]:bottom_right[0]]
 
-        # Separate text and background
-        text_mask, background_mask = separate_text_background(box_region)
+        # # Separate text and background
+        # text_mask, background_mask = separate_text_background(box_region)
+        # Get the dominant color of the text region
+        # text_color = get_dominant_color(box_region, text_mask)
 
         # Get the dominant color of the text region
-        text_color = get_dominant_color(box_region, text_mask)
-
-
+        text_color = np.array(get_text_color(box_region))
         # Get the dominant color of the background region
-        background_color = get_dominant_color(box_region, background_mask)
+        background_color = np.array(get_bg_color(box_region))
+        
         print(f'{ocr_box[1]}: replaced_string={text} text_color={text_color}, background_color={background_color}')
-
 
         # # Draw the rectangle with the text color
         # cv2.rectangle(image, top_left, bottom_right, text_color.tolist(), 2)
@@ -101,7 +101,6 @@ def ocr(src, dst, width=None):
         # Write the detected text above the bounding box
         text_position = (top_left[0], top_left[1]+15)  # Slightly below the top-left corner
         cv2.putText(image, text, text_position, cv2.FONT_HERSHEY_SIMPLEX, 0.8, text_color.tolist(), 2, cv2.LINE_AA)
-        # cv2.putText(image, text, text_position, cv2.FONT_HERSHEY_SIMPLEX, 0.8, text_color.tolist(), 2, cv2.LINE_AA)
 
     # image = draw_red_boxes(image, ocr_data)
     cv2.imwrite(dst, image)
@@ -202,6 +201,22 @@ def draw_red_boxes(image, results):
     return image
 
 
+def get_bg_color(image):
+    # Get background color (the most dominant color)
+    a2D = image.reshape(-1, image.shape[-1])
+    col_range = (256, 256, 256)
+    a1D = np.ravel_multi_index(a2D.T, col_range)
+    return np.unravel_index(np.bincount(a1D).argmax(), col_range)
+
+
+def get_text_color(image):
+    # Get text color (the 2nd dominant color)
+    a2D = image.reshape(-1, image.shape[-1])
+    col_range = (256, 256, 256)
+    a1D = np.ravel_multi_index(a2D.T, col_range)
+    return np.unravel_index(np.argsort(np.bincount(a1D))[-2], col_range)
+
+
 def get_dominant_color(image, mask=None):
     # Convert image to RGB
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
@@ -210,6 +225,7 @@ def get_dominant_color(image, mask=None):
         image = cv2.bitwise_and(image, image, mask=mask)
     # Reshape the image to be a list of pixels
     pixels = image.reshape((-1, 3))
+    # print ('HERE', pixels.shape)
     # Remove zero pixels if mask is applied
     if mask is not None:
         pixels = pixels[np.any(pixels != [0, 0, 0], axis=1)]
@@ -230,6 +246,7 @@ def separate_text_background(box_region):
     text_mask = binary
     background_mask = cv2.bitwise_not(binary)
     return text_mask, background_mask
+
 
 if __name__ == '__main__':
     cli()
