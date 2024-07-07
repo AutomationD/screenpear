@@ -8,7 +8,6 @@ from pathlib import Path
 import easyocr
 import time
 
-
 # Define your custom dictionary
 # TODO: word variations & replacements generation. For now just static
 # TODO: Make this part of a config file
@@ -62,47 +61,55 @@ def ocr(src, dst, width=None):
     # preprocess(src, dst)
     ocr_data = ocr_image(image)
 
-    # Write red boxes around detected text
+    # Extracting text detection result
+    texts = []
+    text_colors = []
+    background_colors = []
+    bboxes = []
+
     for idx, ocr_box in enumerate(ocr_data):
+
+        # Text        
         text = ocr_box[1]
-
-        for replacement in REPLACE_DICT.items():
-            text = text.replace(replacement[0], replacement[1])
-
+        texts.append(text)
+        
+        # Extract the bounding box region
         top_left = tuple([int(val) for val in ocr_box[0][0]])
         bottom_right = tuple([int(val) for val in ocr_box[0][2]])
-        # Extract the bounding box region
         box_region = image[top_left[1]:bottom_right[1], top_left[0]:bottom_right[0]]
-
-        # # Separate text and background
-        # text_mask, background_mask = separate_text_background(box_region)
-        # Get the dominant color of the text region
-        # text_color = get_dominant_color(box_region, text_mask)
+        bboxes.append([top_left, bottom_right])
 
         # Get the dominant color of the text region
         text_color = np.array(get_text_color(box_region))
+        text_colors.append(text_color)
+
         # Get the dominant color of the background region
         background_color = np.array(get_bg_color(box_region))
+        background_colors.append(background_color)
+    
+    # Processing image based on text detection result
+    for idx, txt in enumerate (texts):
+
+        txt_new = txt
+
+        # Replacement lookup
+        for replacement in REPLACE_DICT.items():
+            txt_new = txt_new.replace(replacement[0], replacement[1])
         
-        print(f'{ocr_box[1]}: replaced_string={text} text_color={text_color}, background_color={background_color}')
+        print(f'{txt}: replaced_string={txt_new} text_color={text_colors[idx]}, background_color={background_colors[idx]}')
 
-        # # Draw the rectangle with the text color
-        # cv2.rectangle(image, top_left, bottom_right, text_color.tolist(), 2)
-        # #
-        # # # Optionally, draw a smaller rectangle inside to show background color
-        # # cv2.rectangle(image, (top_left[0] + 5, top_left[1] + 5), (bottom_right[0] - 5, bottom_right[1] - 5), background_color.tolist(), 2)
-        #
-        # # Draw the rectangle with the text color
-        # cv2.rectangle(image, top_left, bottom_right, text_color.tolist(), 2)
-
+        # Draw the rectangle
+        cv2.rectangle(image, bboxes[idx][0], bboxes[idx][1], [0,255,0], 2)
+        
         # Draw a rectangle around the detected text with solid fill
-        cv2.rectangle(image, top_left, bottom_right, background_color.tolist(), cv2.FILLED)
+        cv2.rectangle(image, bboxes[idx][0], bboxes[idx][1], background_colors[idx].tolist(), cv2.FILLED)
 
         # Write the detected text above the bounding box
-        text_position = (top_left[0], top_left[1]+15)  # Slightly below the top-left corner
-        cv2.putText(image, text, text_position, cv2.FONT_HERSHEY_SIMPLEX, 0.8, text_color.tolist(), 2, cv2.LINE_AA)
+        txt_pos = (bboxes[idx][0][0], bboxes[idx][0][1]+15)  # Slightly below the top-left corner
+        
+        cv2.putText(image, txt_new, txt_pos, cv2.FONT_HERSHEY_SIMPLEX, 0.8, text_colors[idx].tolist(), 2, cv2.LINE_AA)
 
-    # image = draw_red_boxes(image, ocr_data)
+    # Writing masked image to file        
     cv2.imwrite(dst, image)
 
 
@@ -211,10 +218,21 @@ def get_bg_color(image):
 
 def get_text_color(image):
     # Get text color (the 2nd dominant color)
+
     a2D = image.reshape(-1, image.shape[-1])
+    a2D = np.float32(a2D)
+    # Define criteria, number of clusters(K) and apply kmeans()
+    criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 10, 1.0)
+    K = 4
+    _, label, center=cv2.kmeans(a2D, K, None, criteria, 10, cv2.KMEANS_RANDOM_CENTERS)
+    # Now convert back into uint8, and make original image
+    center = np.uint8(center)
+    res = center[label.flatten()]
     col_range = (256, 256, 256)
-    a1D = np.ravel_multi_index(a2D.T, col_range)
-    return np.unravel_index(np.argsort(np.bincount(a1D))[-2], col_range)
+    a1D = np.ravel_multi_index(res.T, col_range)
+    txt_color = np.unravel_index(np.argsort(np.bincount(a1D))[-2], col_range)
+    
+    return txt_color
 
 
 def get_dominant_color(image, mask=None):
@@ -225,7 +243,6 @@ def get_dominant_color(image, mask=None):
         image = cv2.bitwise_and(image, image, mask=mask)
     # Reshape the image to be a list of pixels
     pixels = image.reshape((-1, 3))
-    # print ('HERE', pixels.shape)
     # Remove zero pixels if mask is applied
     if mask is not None:
         pixels = pixels[np.any(pixels != [0, 0, 0], axis=1)]
