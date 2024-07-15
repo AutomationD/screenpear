@@ -29,7 +29,8 @@ REPLACE_DICT = {
     'NutCorp': 'SquirrelCorp',
     'DevOps': 'SysAdmin',
     'nutcorp': 'squirrelcorp',
-    'devops': 'sysadmin'
+    'devops': 'sysadmin',
+    'tesseract': 'blue-whale'
 }
 
 
