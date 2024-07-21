@@ -7,30 +7,46 @@ import os
 from pathlib import Path
 import easyocr
 import time
+import re
 
 # Define your custom dictionary
 # TODO: word variations & replacements generation. For now just static
 # TODO: Make this part of a config file
+
+
 REPLACE_DICT = {
     'NutCorp': 'SquirrelCorp',
     'DevOps': 'SysAdmin',
     'nutcorp': 'squirrelcorp',
-    'devops': 'sysadmin'
+    'devops': 'sysadmin',
+    'Search':'Find',
+    'github': 'screenpear',
+    'tesseract': 'EasyOCR',
+    'postgres': 'sqlite',
+    'Upgrade': 'update',
+    'Orange': 'Raspberry'
 }
+
+URL_PATTERNS = ['http://', 
+                'https://',
+                '.com', 
+                'www.'
+                ]
 
 
 @click.group()
 def cli():
     pass
 
-
 @cli.command()
 @click.option('--src', help='')
 @click.option('--dst', help='')
 @click.option('-w', '--width', help='')
+@click.option('--url', is_flag=True, help='')
 
 
-def ocr(src, dst, width=None):
+
+def ocr(src, dst, url, width=None):
 
     date = datetime.datetime.now()
     data_path = os.path.join(os.getcwd(), 'data')
@@ -47,10 +63,10 @@ def ocr(src, dst, width=None):
             os.mkdir(dst)
 
         dst = os.path.join(dst, f'{Path(src).stem}-{date:%Y-%m-%dT%H%M%S}{Path(src).suffix}')
-
+    
     print(f"src: {src}")
     print(f"dst: {dst}")
-
+    
     # Read image in nd array before passing it to easyocr
     image = cv2.imread(src)
     
@@ -72,7 +88,6 @@ def ocr(src, dst, width=None):
         # Text        
         text = ocr_box[1]
         texts.append(text)
-        
         # Extract the bounding box region
         top_left = tuple([int(val) for val in ocr_box[0][0]])
         bottom_right = tuple([int(val) for val in ocr_box[0][2]])
@@ -87,27 +102,76 @@ def ocr(src, dst, width=None):
         background_color = np.array(get_bg_color(box_region))
         background_colors.append(background_color)
     
+
     # Processing image based on text detection result
     for idx, txt in enumerate (texts):
-
-        txt_new = txt
-
-        # Replacement lookup
-        for replacement in REPLACE_DICT.items():
-            txt_new = txt_new.replace(replacement[0], replacement[1])
         
+        txt_new = txt
+                
+        # Word replacement on URL only
+        if url:
+            for url_pattern in URL_PATTERNS:
+                if re.search (url_pattern.lower(), txt_new):
+                    # Replacement lookup        
+                    for replacement in REPLACE_DICT.items():
+                        txt_new = txt_new.replace(replacement[0], replacement[1])
+                    # Trim the URL result
+                    txt_new = url_trim(txt_new)
+                    break
+        
+        # Word replacement on all detected text
+        else:
+            # Replacement lookup        
+            for replacement in REPLACE_DICT.items():
+                txt_new = txt_new.replace(replacement[0], replacement[1])
+
+        # Check if match and replacement is made. Otherwise, skip this text
+        if txt_new == txt:
+            continue
+
         print(f'{txt}: replaced_string={txt_new} text_color={text_colors[idx]}, background_color={background_colors[idx]}')
 
-        # Draw the rectangle
-        cv2.rectangle(image, bboxes[idx][0], bboxes[idx][1], [0,255,0], 2)
-        
-        # Draw a rectangle around the detected text with solid fill
-        cv2.rectangle(image, bboxes[idx][0], bboxes[idx][1], background_colors[idx].tolist(), cv2.FILLED)
+        # Draw the rectangle 
+        # cv2.rectangle(image, bboxes[idx][0], bboxes[idx][1], [255,0,0], 2)
+
+        # Get the text size before writing
+        txt_size, txt_base = cv2.getTextSize(txt_new, cv2.FONT_HERSHEY_SIMPLEX, 1, 2)
+        txt_w, txt_h = txt_size
+
+        # Get the font size. Ratio of text width and rectangle width
+        box_w =  abs(bboxes[idx][0][0] - bboxes[idx][1][0])
+        font_size = box_w / txt_w
+
+        # Get the text size again after resizing before writing
+        txt_size, txt_base = cv2.getTextSize(txt_new, cv2.FONT_HERSHEY_SIMPLEX, font_size, 2)
+        txt_w, txt_h = txt_size
 
         # Write the detected text above the bounding box
-        txt_pos = (bboxes[idx][0][0], bboxes[idx][0][1]+15)  # Slightly below the top-left corner
+        ## Get height of the box
+        box_h =  bboxes[idx][0][1] - bboxes[idx][1][1]
+        ## Calculate text y offset
+        text_offset_y = int(abs(box_h-txt_h) / 2)
+        # Calculate the text corners
+        txt_bot_left = (bboxes[idx][0][0], 
+                        bboxes[idx][0][1]+text_offset_y)
+        txt_top_right = (bboxes[idx][0][0] + txt_w, 
+                         bboxes[idx][0][1]+text_offset_y-txt_h)
         
-        cv2.putText(image, txt_new, txt_pos, cv2.FONT_HERSHEY_SIMPLEX, 0.8, text_colors[idx].tolist(), 2, cv2.LINE_AA)
+        cv2.rectangle(image, 
+                      (txt_bot_left[0], txt_bot_left[1] + int(txt_h*0.3)), 
+                      (txt_top_right[0], txt_top_right[1] - int(txt_h*0.3)), 
+                      background_colors[idx].tolist(), 
+                      cv2.FILLED
+                      )
+        
+        cv2.putText(image, 
+                    txt_new, 
+                    txt_bot_left, 
+                    cv2.FONT_HERSHEY_SIMPLEX, 
+                    font_size, 
+                    text_colors[idx].tolist(), 
+                    2, 
+                    cv2.LINE_AA)
 
     # Writing masked image to file        
     cv2.imwrite(dst, image)
@@ -165,15 +229,6 @@ def ocr_image(src):
 
     # Initialize the reader
     reader = easyocr.Reader(['en'], gpu=True)
-
-    # Define a function to match detected words with the custom dictionary
-    # def custom_decoder(recognized_text, custom_dict_variations):
-    #     recognized_words = []
-    #     for item in recognized_text:
-    #         text = item[1]
-    #         if text in custom_dict:
-    #             recognized_words.append(item)
-    #     return recognized_words
 
     # Start the timer
     start_time = time.time()
@@ -255,6 +310,16 @@ def get_dominant_color(image, mask=None):
     dominant_color = palette[0].astype(int)
     return dominant_color
 
+
+def url_trim(url_str):
+    # Correcting possible errors
+    word_to_trim = {' com': '.com', 'www ': 'www.' }
+    for word_ in word_to_trim:
+        txt_new = url_str.replace(word_, word_to_trim[word_])
+    # white space stripping
+    txt_new = txt_new.replace(' ', '')
+    return txt_new
+    
 
 # Function to separate text and background
 def separate_text_background(box_region):
