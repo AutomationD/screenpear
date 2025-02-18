@@ -33,12 +33,16 @@ REPLACE_DICT = {
     'DevOps': 'SysAdmin',
     'nutcorp': 'squirrelcorp',
     'devops': 'sysadmin',
-    'Search':'Find',
+    # 'Search':'Find',
     'github': 'screenpear',
     'tesseract': 'EasyOCR',
     'postgres': 'sqlite',
     'Upgrade': 'update',
-    'Orange': 'Raspberry'
+    'Orange': 'Raspberry',
+    'metameetings': 'instabark',
+    'mapdigital': 'barkdigital',
+    'mm-core': 'ib-core',
+    'mm-': 'ib-'
 }
 
 URL_PATTERNS = ['http://', 
@@ -149,7 +153,7 @@ def ocr(src, dst, url, width=None):
         # cv2.rectangle(image, bboxes[idx][0], bboxes[idx][1], [255,0,0], 2)
 
         # Get the text size before writing
-        txt_size, txt_base = cv2.getTextSize(txt_new, cv2.FONT_HERSHEY_SIMPLEX, 1, 2)
+        txt_size, txt_base = cv2.getTextSize(txt_new, cv2.FONT_HERSHEY_DUPLEX, 1, 1)
         txt_w, txt_h = txt_size
 
         # Get the font size. Ratio of text width and rectangle width
@@ -157,7 +161,7 @@ def ocr(src, dst, url, width=None):
         font_size = box_w / txt_w
 
         # Get the text size again after resizing before writing
-        txt_size, txt_base = cv2.getTextSize(txt_new, cv2.FONT_HERSHEY_SIMPLEX, font_size, 2)
+        txt_size, txt_base = cv2.getTextSize(txt_new, cv2.FONT_HERSHEY_DUPLEX, font_size, 1)
         txt_w, txt_h = txt_size
 
         # Write the detected text above the bounding box
@@ -181,10 +185,10 @@ def ocr(src, dst, url, width=None):
         cv2.putText(image, 
                     txt_new, 
                     txt_bot_left, 
-                    cv2.FONT_HERSHEY_SIMPLEX, 
+                    cv2.FONT_HERSHEY_DUPLEX,
                     font_size, 
                     text_colors[idx].tolist(), 
-                    2, 
+                    1,
                     cv2.LINE_AA)
 
     # Writing masked image to file        
